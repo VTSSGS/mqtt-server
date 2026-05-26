@@ -12,10 +12,18 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@supabase/supabase-js": "^2.106.1",
+    "@supabase/supabase-js": "^2.106.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mqtt": "^5.15.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VTSSGS/mqtt-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VTSSGS/mqtt-server/issues"
+  },
+  "homepage": "https://github.com/VTSSGS/mqtt-server#readme"
 }

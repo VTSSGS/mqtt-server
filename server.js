@@ -1,150 +1,137 @@
-const express = require("express");
-const mqtt = require("mqtt");
-const cors = require("cors");
+require('dotenv').config();
+
+const express = require('express');
+const mqtt = require('mqtt');
+const cors = require('cors');
 
 const { createClient } =
-require("@supabase/supabase-js");
+require('@supabase/supabase-js');
 
 const app = express();
 
 app.use(cors());
-
 app.use(express.json());
 
 // =====================================================
 // SUPABASE
 // =====================================================
 
-const supabaseUrl =
-"YOUR_SUPABASE_URL";
-
-const supabaseKey =
-"YOUR_SUPABASE_ANON_KEY";
-
-const supabase =
-createClient(
-  supabaseUrl,
-  supabaseKey
-);
-
-// =====================================================
-// MQTT
-// =====================================================
-
-const MQTT_HOST =
-"ef8062854f4046e2ab431515a833df52.s1.eu.hivemq.cloud";
-
-const mqttClient =
-mqtt.connect(
-`mqtts://${MQTT_HOST}:8883`,
-{
-  username: "mainserver",
-  password: "mainpassword",
-}
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
 );
 
 // =====================================================
 // MQTT CONNECT
 // =====================================================
 
-mqttClient.on("connect", () => {
+const mqttClient = mqtt.connect({
+  host: process.env.MQTT_HOST,
+  port: process.env.MQTT_PORT,
+  protocol: 'mqtts',
+  username: process.env.MQTT_USERNAME,
+  password: process.env.MQTT_PASSWORD,
+});
 
-  console.log(
-    "MQTT CONNECTED"
-  );
+// =====================================================
+// MQTT CONNECTED
+// =====================================================
 
-  mqttClient.subscribe(
-    "relay/data/+"
-  );
+mqttClient.on('connect', () => {
 
-  mqttClient.subscribe(
-    "relay/status/+"
-  );
+  console.log('================================');
+
+  console.log('MQTT CONNECTED');
+
+  console.log('================================');
+
+  mqttClient.subscribe('relay/data/+');
+
+  mqttClient.subscribe('relay/status/+');
+
+  console.log('Subscribed relay/data/+');
+
+  console.log('Subscribed relay/status/+');
 });
 
 // =====================================================
 // MQTT RECEIVE
 // =====================================================
 
-mqttClient.on(
-"message",
-async(topic, message) => {
+mqttClient.on('message', async (
+  topic,
+  message
+) => {
 
   try {
 
-    const msg =
-    JSON.parse(
-      message.toString()
-    );
+    const payload =
+      JSON.parse(message.toString());
 
-    console.log(
-      topic,
-      msg
-    );
+    console.log('--------------------------------');
 
-    const parts =
-    topic.split("/");
+    console.log('TOPIC:', topic);
 
-    const type =
-    parts[1];
+    console.log('DATA:', payload);
 
-    const deviceId =
-    parts[2];
+    // ============================================
+    // DEVICE SENSOR DATA
+    // ============================================
 
-    // =========================================
-    // DEVICE DATA
-    // =========================================
+    if(topic.startsWith('relay/data/')) {
 
-    if(type === "data")
-    {
+      const { error } =
       await supabase
-      .from("device_data")
-      .insert({
+        .from('device_data')
+        .insert([
+          {
+            device_id:
+              payload.device_id,
 
-        device_id:
-        deviceId,
+            voltage:
+              payload.voltage,
 
-        voltage:
-        msg.voltage,
+            current:
+              payload.current,
 
-        current:
-        msg.current,
+            status:
+              payload.status,
 
-        status:
-        msg.status
-      });
+            input_freq:
+              payload.input_freq,
 
-      console.log(
-        "DATA SAVED"
-      );
+            output_freq:
+              payload.output_freq
+          }
+        ]);
+
+      if(error) {
+
+        console.log('SUPABASE ERROR');
+
+        console.log(error);
+
+      } else {
+
+        console.log('DATA INSERTED');
+      }
     }
 
-    // =========================================
-    // DEVICE STATUS
-    // =========================================
+    // ============================================
+    // STATUS DATA
+    // ============================================
 
-    if(type === "status")
-    {
-      await supabase
-      .from("device_status")
-      .upsert({
-
-        device_id:
-        deviceId,
-
-        mode:
-        msg.mode,
-
-        updated_at:
-        new Date()
-      });
+    if(topic.startsWith('relay/status/')) {
 
       console.log(
-        "STATUS SAVED"
+        'STATUS:',
+        payload.mode
       );
     }
 
   } catch(err) {
+
+    console.log('MESSAGE ERROR');
 
     console.log(err);
   }
@@ -154,132 +141,111 @@ async(topic, message) => {
 // RELAY CONTROL API
 // =====================================================
 
-app.post(
-"/control",
-async(req,res)=>{
+app.post('/relay', (req, res) => {
 
   try {
 
-    const {
-      device_id,
-      mode
-    } = req.body;
+    const device_id =
+      req.body.device_id;
+
+    const mode =
+      req.body.mode;
 
     const topic =
-    `relay/control/${device_id}`;
+      `relay/control/${device_id}`;
 
     const payload =
-    JSON.stringify({
-      mode: mode
-    });
+      JSON.stringify({ mode });
 
     mqttClient.publish(
       topic,
       payload
     );
 
-    console.log(
+    console.log('RELAY SENT');
+
+    console.log(topic);
+
+    console.log(payload);
+
+    res.json({
+      success: true
+    });
+
+  } catch(err) {
+
+    res.status(500).json({
+      success: false
+    });
+  }
+});
+
+// =====================================================
+// FREQUENCY API
+// =====================================================
+
+app.post('/frequency', (req, res) => {
+
+  try {
+
+    const device_id =
+      req.body.device_id;
+
+    const freq =
+      req.body.freq;
+
+    const topic =
+      `vfd/control/${device_id}`;
+
+    const payload =
+      JSON.stringify({ freq });
+
+    mqttClient.publish(
       topic,
       payload
     );
 
+    console.log('FREQUENCY SENT');
+
+    console.log(topic);
+
+    console.log(payload);
+
     res.json({
-      success:true
+      success: true
     });
 
   } catch(err) {
 
-    console.log(err);
-
     res.status(500).json({
-      success:false
+      success: false
     });
   }
 });
 
 // =====================================================
-// GET LATEST DATA
+// TEST API
 // =====================================================
 
-app.post(
-"/data",
-async(req,res)=>{
+app.get('/', (req, res) => {
 
-  try {
-
-    const {
-      device_id
-    } = req.body;
-
-    const { data } =
-    await supabase
-    .from("device_data")
-    .select("*")
-    .eq(
-      "device_id",
-      device_id
-    )
-    .order("id", {
-      ascending:false
-    })
-    .limit(1)
-    .single();
-
-    res.json(data);
-
-  } catch(err) {
-
-    console.log(err);
-
-    res.status(500).json({
-      success:false
-    });
-  }
+  res.send('MQTT SERVER RUNNING');
 });
 
 // =====================================================
-// GET STATUS
+// START SERVER
 // =====================================================
 
-app.post(
-"/status",
-async(req,res)=>{
+const PORT =
+  process.env.PORT || 3000;
 
-  try {
+app.listen(PORT, () => {
 
-    const {
-      device_id
-    } = req.body;
-
-    const { data } =
-    await supabase
-    .from("device_status")
-    .select("*")
-    .eq(
-      "device_id",
-      device_id
-    )
-    .single();
-
-    res.json(data);
-
-  } catch(err) {
-
-    console.log(err);
-
-    res.status(500).json({
-      success:false
-    });
-  }
-});
-
-// =====================================================
-// SERVER
-// =====================================================
-
-app.listen(3000, ()=>{
+  console.log('================================');
 
   console.log(
-    "SERVER RUNNING ON PORT 3000"
+    `SERVER RUNNING ON ${PORT}`
   );
+
+  console.log('================================');
 });
