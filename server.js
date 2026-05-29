@@ -80,40 +80,64 @@ mqttClient.on('message', async (
 
     if(topic.startsWith('relay/data/')) {
 
-      const { error } =
+      // ============================================
+      // UPDATE LIVE TABLE
+      // ============================================
+
+      const liveUpdate =
+      await supabase
+        .from('device_live')
+        .update({
+          voltage: payload.voltage,
+          current: payload.current,
+          input_freq: payload.input_freq,
+          output_freq: payload.output_freq,
+          status: payload.status,
+          updated_at: new Date()
+        })
+        .eq(
+          'device_id',
+          payload.device_id
+        );
+
+      if(liveUpdate.error) {
+
+        console.log('LIVE UPDATE ERROR');
+
+        console.log(liveUpdate.error);
+
+      } else {
+
+        console.log('LIVE UPDATED');
+      }
+
+      // ============================================
+      // INSERT HISTORY TABLE
+      // ============================================
+
+      const historyInsert =
       await supabase
         .from('device_data')
         .insert([
           {
-            device_id:
-              payload.device_id,
-
-            voltage:
-              payload.voltage,
-
-            current:
-              payload.current,
-
-            status:
-              payload.status,
-
-            input_freq:
-              payload.input_freq,
-
-            output_freq:
-              payload.output_freq
+            device_id: payload.device_id,
+            voltage: payload.voltage,
+            current: payload.current,
+            input_freq: payload.input_freq,
+            output_freq: payload.output_freq,
+            status: payload.status
           }
         ]);
 
-      if(error) {
+      if(historyInsert.error) {
 
-        console.log('SUPABASE ERROR');
+        console.log('HISTORY INSERT ERROR');
 
-        console.log(error);
+        console.log(historyInsert.error);
 
       } else {
 
-        console.log('DATA INSERTED');
+        console.log('HISTORY INSERTED');
       }
     }
 
@@ -174,6 +198,8 @@ app.post('/relay', (req, res) => {
 
   } catch(err) {
 
+    console.log(err);
+
     res.status(500).json({
       success: false
     });
@@ -216,6 +242,8 @@ app.post('/frequency', (req, res) => {
     });
 
   } catch(err) {
+
+    console.log(err);
 
     res.status(500).json({
       success: false
