@@ -40,17 +40,13 @@ const mqttClient = mqtt.connect({
 mqttClient.on('connect', () => {
 
   console.log('================================');
-
   console.log('MQTT CONNECTED');
-
   console.log('================================');
 
   mqttClient.subscribe('relay/data/+');
-
   mqttClient.subscribe('relay/status/+');
 
   console.log('Subscribed relay/data/+');
-
   console.log('Subscribed relay/status/+');
 });
 
@@ -69,9 +65,7 @@ mqttClient.on('message', async (
       JSON.parse(message.toString());
 
     console.log('--------------------------------');
-
     console.log('TOPIC:', topic);
-
     console.log('DATA:', payload);
 
     // ============================================
@@ -80,9 +74,17 @@ mqttClient.on('message', async (
 
     if(topic.startsWith('relay/data/')) {
 
-      // ============================================
+      // GET DEVICE ID FROM TOPIC
+      // relay/data/customer001
+
+      const device_id =
+        topic.split('/')[2];
+
+      console.log('DEVICE ID:', device_id);
+
+      // ==========================================
       // UPDATE LIVE TABLE
-      // ============================================
+      // ==========================================
 
       const liveUpdate =
       await supabase
@@ -97,30 +99,29 @@ mqttClient.on('message', async (
         })
         .eq(
           'device_id',
-          payload.device_id
+          device_id
         );
 
       if(liveUpdate.error) {
 
-        console.log('LIVE UPDATE ERROR');
-
+        console.log('DEVICE LIVE ERROR');
         console.log(liveUpdate.error);
 
       } else {
 
-        console.log('LIVE UPDATED');
+        console.log('DEVICE LIVE UPDATED');
       }
 
-      // ============================================
+      // ==========================================
       // INSERT HISTORY TABLE
-      // ============================================
+      // ==========================================
 
       const historyInsert =
       await supabase
         .from('device_data')
         .insert([
           {
-            device_id: payload.device_id,
+            device_id: device_id,
             voltage: payload.voltage,
             current: payload.current,
             input_freq: payload.input_freq,
@@ -131,13 +132,12 @@ mqttClient.on('message', async (
 
       if(historyInsert.error) {
 
-        console.log('HISTORY INSERT ERROR');
-
+        console.log('DEVICE DATA ERROR');
         console.log(historyInsert.error);
 
       } else {
 
-        console.log('HISTORY INSERTED');
+        console.log('DEVICE DATA INSERTED');
       }
     }
 
@@ -156,7 +156,6 @@ mqttClient.on('message', async (
   } catch(err) {
 
     console.log('MESSAGE ERROR');
-
     console.log(err);
   }
 });
@@ -186,56 +185,11 @@ app.post('/relay', (req, res) => {
       payload
     );
 
+    console.log('================================');
     console.log('RELAY SENT');
-
     console.log(topic);
-
     console.log(payload);
-
-    res.json({
-      success: true
-    });
-
-  } catch(err) {
-
-    console.log(err);
-
-    res.status(500).json({
-      success: false
-    });
-  }
-});
-
-// =====================================================
-// FREQUENCY API
-// =====================================================
-
-app.post('/frequency', (req, res) => {
-
-  try {
-
-    const device_id =
-      req.body.device_id;
-
-    const freq =
-      req.body.freq;
-
-    const topic =
-      `vfd/control/${device_id}`;
-
-    const payload =
-      JSON.stringify({ freq });
-
-    mqttClient.publish(
-      topic,
-      payload
-    );
-
-    console.log('FREQUENCY SENT');
-
-    console.log(topic);
-
-    console.log(payload);
+    console.log('================================');
 
     res.json({
       success: true
@@ -270,10 +224,8 @@ const PORT =
 app.listen(PORT, () => {
 
   console.log('================================');
-
   console.log(
     `SERVER RUNNING ON ${PORT}`
   );
-
   console.log('================================');
 });
