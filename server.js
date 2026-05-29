@@ -74,7 +74,6 @@ mqttClient.on('message', async (
 
     if(topic.startsWith('relay/data/')) {
 
-      // GET DEVICE ID FROM TOPIC
       // relay/data/customer001
 
       const device_id =
@@ -83,23 +82,25 @@ mqttClient.on('message', async (
       console.log('DEVICE ID:', device_id);
 
       // ==========================================
-      // UPDATE LIVE TABLE
+      // UPSERT LIVE TABLE
       // ==========================================
 
       const liveUpdate =
       await supabase
         .from('device_live')
-        .update({
-          voltage: payload.voltage,
-          current: payload.current,
-          input_freq: payload.input_freq,
-          output_freq: payload.output_freq,
-          status: payload.status,
-          updated_at: new Date()
-        })
-        .eq(
-          'device_id',
-          device_id
+        .upsert(
+          {
+            device_id: device_id,
+            voltage: payload.voltage,
+            current: payload.current,
+            input_freq: payload.input_freq,
+            output_freq: payload.output_freq,
+            status: payload.status,
+            updated_at: new Date()
+          },
+          {
+            onConflict: 'device_id'
+          }
         );
 
       if(liveUpdate.error) {
